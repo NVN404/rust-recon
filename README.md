@@ -1,4 +1,4 @@
-# 🛡️ rust-recon (Custom Skill)
+# 🛡️ rust-recon 
 
 **The AI-powered Skill for mathematically verified protocol reconnaissance reports.**
 
@@ -58,7 +58,7 @@ git clone https://github.com/NVN404/rust-recon ~/.rust-recon-skill
 
 ---
 
-## 🎯 Universal Recon Command Pattern
+## Universal Recon Command Pattern
 
 **Regardless of which AI agent you use**, the command always follows this simple pattern:
 
@@ -145,7 +145,7 @@ Use these to understand expected output quality and structure.
 
 ---
 
-## 🔄 How It Works with the Tool
+##  How It Works with the Tool
 
 ```
 ┌─────────────────────────────────────────┐
@@ -198,7 +198,7 @@ If you want to use the tool **without this skill**, see the [rust-recon-tool REA
 
 ---
 
-## 📝 Example Invocations
+##  Example Invocations
 
 **In your AI agent, inside your Anchor workspace:**
 
@@ -231,7 +231,7 @@ Found a bug or want to enhance the skill? Contributions welcome!
 
 ---
 
-## 📄 License
+## License
 
 This skill is part of the `rust-recon` ecosystem and is licensed under the **MIT License**. 
 

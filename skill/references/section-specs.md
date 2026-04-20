@@ -108,36 +108,63 @@ Rules:
 4. `Unchecked`: `Yes` for `AccountInfo` or `UncheckedAccount`, otherwise `No`.
 5. `Constraint Summary`: short, key-only summary (seeds, has_one, address, init).
 
-### 2c - Account Fact Cards
+### 2c. Execution Flow
 
-Emit one card per non-skipped account.
-Skip cards for standard program/sysvar accounts:
-- `system_program`
-- `rent`
-- `token_program`
-- `associated_token_program`
+Source: `execution_steps[]` from facts.json — ordered list of extracted AST nodes.
+Every step is traceable to a specific statement in the function body.
 
-Card template:
+Format each step as:
+  `N. [KIND] expression → assigned_to (if any)`
 
-```text
-account_name [AccountType] - one-line role description (inference)
-- Validated by: concise list, or None
-- Mutation: Mutable | Immutable | Init | Close
-- Gap: only if meaningful
-- Manual check: one concrete source check
-```
+Kinds:
+  [LET]    — variable binding
+  [ASSIGN] — field mutation  
+  [CPI]    — cross-program invocation
+  [SOL]    — direct lamport transfer
+  [AUTH]   — set_authority call
+  [CHECK]  — require! check
+  [EMIT]   — event emission
+  [IF]     — conditional branch
 
-### 2d - Body Checks
+If execution_steps[] is empty:
+> Execution order not extracted. Verify manually in source.
 
-If checks exist, one line per check:
+RULE: Never infer or fill steps that are not in execution_steps[].
+If a step is NOT_EXTRACTED, write it as:
+> Step N: NOT_EXTRACTED — verify in source
 
-```text
-require!(condition) -> ErrorName
-require_keys_eq!(lhs, rhs) -> ErrorName
-```
+### 2d. Data Mutations
 
-If none:
-- `No extracted body checks. verify manually.`
+Source: `state_mutations[]`, `sol_flows[]`, `token_flows[]`, `set_authority_calls[]`
+Only list mutations that appear in these arrays.
+Never infer mutations from account names or instruction semantics.
+
+Format:
+
+**State Changes:**
+| Account | Field | Operation | Value Expression |
+|---|---|---|---|
+(from state_mutations[])
+
+**SOL Flows:**
+| From | To | Amount | Method |
+|---|---|---|---|
+(from sol_flows[])
+
+**Token Flows:**
+| From | To | Amount | Method |
+|---|---|---|---|
+(from token_flows[])
+
+**Authority Changes:**
+| Account | Authority Type | New Authority | Note |
+|---|---|---|---|
+(from set_authority_calls[])
+
+If any array is empty:
+> [ArrayName] not extracted — verify in source.
+
+RULE: Every row must come from facts.json. Zero inference permitted.
 
 ### 2e - Arithmetic Analysis
 

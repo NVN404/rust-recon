@@ -2,7 +2,7 @@
 
 **The AI-powered Skill for mathematically verified protocol reconnaissance reports.**
 
-`rust-recon` is a modular AI Skill that orchestrates the [rust-recon-tool](https://github.com/NVN404/rust-recon-tool) to generate hallucination-free recon reports with 9 structured sections covering architecture, trust model, CPI flows, and security findings.
+`rust-recon` is a modular AI Skill that orchestrates the [rust-recon-tool](https://github.com/NVN404/rust-recon-tool) to generate hallucination-free recon reports with 9 structured sections covering architecture, trust model, CPI flows, and recon signals.
 
 🤖 **Works with:** Claude, Copilot, Cursor, Codex, and any AI agent supporting custom skills/commands.
 
@@ -22,7 +22,7 @@ When you invoke `/recon` in your AI agent (after installing this skill):
    - Authority & Trust Model
    - Token & CPI Flows
    - Error Code Registry
-   - Security Findings (section 7)
+   - Recon Signals Summary (section 7)
    - Manual Verification Checklist
    - Recon Metadata
 
@@ -101,40 +101,43 @@ The main orchestrator script. It:
 - Downloads `rust-recon` to `~/.rust-recon_tool` (global)
 - Compiles the tool via `cargo install`
 - Reads all modular skill files below
+- Enforces strict section schema and quality gates before returning output
 - Generates the final report
 
 ### `skill/core.md`
 **Hard Rules & Constraints:**
 - 9-section structure definition
-- Exact count methodology
-- ASCII-only diagrams (no Mermaid in condensed mode)
-- Zero hallucination enforcement
+- Source priority and no-conflict precedence
+- Exact table schemas for Section 2
+- ASCII-only diagrams (no Mermaid)
+- Recon-first output rules (no risk/severity columns in Section 2)
 
 ### `skill/references/facts-schema.md`
 **Data Dictionary:**
 - Explains every field in `facts.json`
 - `wrapper_type` definitions
 - `body_checks` interpretation
-- `flags[]` severity levels
+- `flags[]` as parser signal metadata for Section 7
 
 ### `skill/references/section-specs.md`
 **What Each Section Must Contain:**
-- Section 1–9 specification (line ranges, tables, content rules)
+- Section 1–9 exact schema and ordering contract
+- Required table headers and rendering rules
 - Detailed vs. condensed mode differences
 
 ### `skill/references/audit-patterns.md`
-**Mechanical Security Analysis:**
-- All section 2f (instruction-level) audit checks
+**Mechanical Recon Analysis:**
+- All section 2f (instruction-level) recon checks
 - Section 3a PDA tagging rules
 - Re-initialization safety analysis
-- UncheckedAccount risk assessment
+- Unchecked-account verification patterns
 
 ### `skill/references/cpi-rules.md`
 **Cross-Program Invocation Rules:**
 - Implicit CPI naming conventions
 - Token-2022 detection
 - Extraction limitation warnings
-- CPI flow visualization
+- CPI flow visualization and manual verification prompts
 
 ### `skill/examples/`
 **Reference Reports:**

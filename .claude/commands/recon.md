@@ -1,81 +1,113 @@
-# rust-recon Claude Orchestrator
+# rust-recon Orchestrator (Strict, Recon-First)
 
-This is the entry point for generating deep security recon reports using rust-recon.
+This command is the only execution path for generating `recon.md`.
 
-## Step 0 — Prerequisites Check
+## Source Priority (Mandatory)
+
+If guidance conflicts, resolve in this order:
+1. `skill/core.md`
+2. `skill/references/section-specs.md`
+3. `skill/references/audit-patterns.md`
+4. `skill/references/cpi-rules.md`
+5. `skill/examples/*` (non-authoritative)
+
+Do not invent formatting outside these rules.
+
+## Step 0 - Prerequisites Check
+
 Before anything else, confirm:
-1. You are inside a Solana Anchor project directory.
-2. `Anchor.toml` exists at the workspace root.
-3. Rust toolchain is installed (`rustc --version` should succeed).
-If `Anchor.toml` is not found, stop and tell the user: "This does not appear to be an Anchor workspace."
+1. You are in a Solana Anchor project directory.
+2. `Anchor.toml` exists at workspace root.
+3. Rust toolchain is available (`rustc --version`).
 
-## Step 1 — Install rust-recon & Skill Context
-Since Claude Skills cannot easily bundle Rust binaries, we clone the tool repository locally (if not already present), install the binary, and map our skill context to this process.
+If `Anchor.toml` is missing, stop and return:
+"This does not appear to be an Anchor workspace. Navigate to the project root and try again."
 
-Check if `~/.rust-recon_tool` exists.
+## Step 1 - Ensure rust-recon Binary
+
+Check binary first:
+
 ```bash
-export TARGET_DIR=~/.rust-recon_tool
-if [ ! -d "$TARGET_DIR" ]; then
-    git clone https://github.com/NVN404/rust-recon.git $TARGET_DIR
-    cd $TARGET_DIR
-    cargo install --path cli
-else
-    cd $TARGET_DIR && git pull
-fi
 rust-recon --version
 ```
 
-## Step 2 — Generate Recon Data
-Return to the project directory and run:
+If missing, install:
+
+```bash
+export TARGET_DIR=~/.rust-recon_tool
+if [ ! -d "$TARGET_DIR" ]; then
+    git clone https://github.com/NVN404/rust-recon.git "$TARGET_DIR"
+else
+    cd "$TARGET_DIR" && git pull
+fi
+cd "$TARGET_DIR"
+cargo install --path cli
+rust-recon --version
+```
+
+If install fails, report the exact error and stop.
+
+## Step 2 - Generate Recon Data
+
+From the Anchor project root:
+
 ```bash
 rust-recon scope
 rust-recon facts
 ```
 
-## Step 3 — Load Context
-Read these files from the current skill directory IN ORDER before writing a single line of output:
-1. `skill/core.md`          — Hard rules, section order (1-9)
-2. `skill/references/facts-schema.md`    — What fields mean
-3. `skill/references/section-specs.md`  — What each section contains
-4. `skill/references/audit-patterns.md` — Mechanical checks (2f, 3a)
-5. `skill/references/cpi-rules.md`      — CPI handling and Token-2022
-6. `skill/examples/*`      — Example reports for reference
-7. `.rust-recon/scope.json` (from current project)
-8. `.rust-recon/facts.json` (Ground truth, from current project)
-9. `.rust-recon/summary.json` (from current project)
+Required outputs:
+- `.rust-recon/scope.json`
+- `.rust-recon/facts.json`
+- `.rust-recon/summary.json`
 
-> **Note:** If unsure about output quality or formatting, refer to `skill/examples/` for reference.
+If any file is missing, stop and report exactly which command/file failed.
 
-## Step 4 — Detect Report Format from User Input
-Parse the user's input to determine report style:
-- If user input contains `condensed`, use **Condensed Format** (250-350 lines, ASCII only, exact counts)
-- If user input contains `detailed`, use **Detailed Format** (1000+ lines, full analysis)
-- Default: **Standard Format** (550-700 lines, balanced detail)
+## Step 3 - Read Context in Exact Order
 
-**Important:** The format choice affects:
-- Section 2 (Instruction Surface): 1 summary table (condensed) vs. detailed per-instruction breakdown (detailed)
-- Diagrams: ASCII art only (no Mermaid in condensed mode)
-- Tone: Executive summary vs. comprehensive technical analysis
+Read these files in this exact sequence before drafting any report text:
+1. `skill/core.md`
+2. `skill/references/facts-schema.md`
+3. `skill/references/section-specs.md`
+4. `skill/references/audit-patterns.md`
+5. `skill/references/cpi-rules.md`
+6. `.rust-recon/scope.json`
+7. `.rust-recon/facts.json`
+8. `.rust-recon/summary.json`
 
-## Step 5 — Output Quality Gate (Mandatory)
-Before finalizing `recon.md`, run this strict self-check. If any check fails, regenerate the relevant section.
+Important:
+- Do not use examples to define schema.
+- Examples may be consulted only for diagram readability when needed.
 
-### Section 4 (ASCII Diagram Gate)
-- Reject output if 4a/4b/4c is a flat box with list text only.
-- Each of 4a/4b/4c must contain:
-    1) at least 3 boxed nodes
-    2) at least 4 directional edges/arrows
-    3) at least 2 hierarchy levels
-- Ensure role/instruction/state flow is visible in 4a.
-- Ensure phased transitions are visible in 4b.
-- Ensure seed/constraint/account dependency paths are visible in 4c.
+## Step 4 - Choose Format
 
-### Section 8 (Checklist Readability Gate)
-- Reject output if multiple checklist items appear on one line.
-- Enforce one `[ ]` item per line with blank lines between categories.
-- Enforce category order:
-    1) Missing body checks
-    2) Unchecked accounts
-    3) Arithmetic checks
-    4) Struct-field checks
-- Deduplicate identical checklist rows.
+- If user explicitly says `condensed`, use condensed mode.
+- Otherwise default to `detailed`.
+
+No third "standard" mode is allowed.
+
+## Step 5 - Generate Report
+
+Write `recon.md` at project root.
+
+Mandatory constraints:
+- Follow section order 1-9 from `skill/core.md`.
+- For each instruction, include subsections 2a-2f in order.
+- Section 2a table header must be exactly: `Param | Type | Notes`
+- Section 2b table header must be exactly: `Account | Type | Mut | Signer | Unchecked | Constraint Summary`
+- Section 2e table header must be exactly: `Op | Style | Expression | Impact`
+- No `Risk` or `Severity` column in Section 2 tables.
+- No red/yellow/blue indicator emoji in findings sections.
+- Diagrams must be ASCII only.
+
+## Step 6 - Quality Gate (Fail Closed)
+
+Before returning output, validate:
+1. All 9 sections exist in the required order.
+2. Every instruction has all subsections 2a-2f.
+3. Table headers exactly match required schema.
+4. No forbidden columns (`Risk`, `Severity`) in Section 2 tables.
+5. Section 4 diagrams show directional flow (not flat lists).
+6. Section 8 checklist has one item per line.
+
+If any check fails, regenerate the affected section(s) and re-run this gate.

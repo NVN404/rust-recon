@@ -1,22 +1,47 @@
-## v2 `facts.json` Field Reference
+## v3 facts.json Field Reference
 
-The skill now consumes these fields per instruction. Know what each means before using it:
+This reference defines how extracted fields map to recon report sections.
 
-| Field | Source | Meaning |
+## Instruction-Level Fields
+
+| Field | Source | Meaning | Report Usage |
+|---|---|---|---|
+| `name` | instruction fn name | Instruction identifier | Section 2 header |
+| `context` | Anchor context struct | Account context name | Section 2 header |
+| `params[]` | function signature | Caller-provided parameters (`name`, `type`, `overflow_risk`) | Section 2a |
+| `accounts[]` | context fields | Account metadata and constraints | Section 2b and 2c |
+| `body_checks[]` | `require!` and key equality macros | Runtime checks extracted from body | Section 2d |
+| `arithmetic[]` | binary operation extraction | Arithmetic style and expression details | Section 2e |
+| `cpi_calls[]` | CPI call extraction | Explicit CPI target/method/signer seeds | Section 5 |
+| `events_emitted[]` | `emit!` calls | Instruction event names | Section 1/2 notes |
+| `uses_remaining_accounts` | `ctx.remaining_accounts` usage | Indicates dynamic account intake | Section 2f / 7 / 8 checklist |
+| `error_codes_referenced[]` | parser cross-reference | Referenced custom errors | Section 6 |
+
+## Account Field Details
+
+| Field | Meaning | Notes |
 |---|---|---|
-| `params[]` | function signature | Caller-supplied arguments (name + type + overflow_risk flag) |
-| `accounts[].wrapper_type` | context struct field type | `Account`, `Signer`, `UncheckedAccount`, `AccountInfo`, `Program`, etc. |
-| `accounts[].inner_type` | generic arg of wrapper | The data struct type (e.g. `LiquidityPool`) or `null` |
-| `accounts[].unchecked` | derived | `true` if wrapper is `UncheckedAccount` or `AccountInfo` |
-| `accounts[].has_one` | `has_one =` in macro | List of field names that must match on the account struct |
-| `accounts[].close_target` | `close =` in macro | Account that receives lamports on close, or `null` |
-| `accounts[].attributes` | raw macro string | Verbatim `#[account(...)]` string |
-| `body_checks[]` | `require!` / `require_keys_eq!` etc. | Runtime invariant checks inside function body |
-| `arithmetic[]` | binary ops in body | Each op: `operation`, `style` (checked/unchecked), `expression`, `overflow_risk` |
-| `events_emitted[]` | `emit!()` calls | Event struct names emitted by this instruction |
-| `uses_remaining_accounts` | `ctx.remaining_accounts` | Boolean — unvalidated account injection surface |
-| `cpi_calls[]` | CPI invocations | `program`, `method`, `signer_seeds` |
-| `flags[]` | top-level aggregated | Pre-computed issues from the extractor — import directly into Section 7 |
+| `wrapper_type` | Anchor wrapper (`Account`, `Signer`, `Program`, `AccountInfo`, `UncheckedAccount`) | Used for `Type`, `Signer`, `Unchecked` columns |
+| `inner_type` | Generic inner type when present | Used for readable account typing |
+| `unchecked` | Derived bool (`AccountInfo` or `UncheckedAccount`) | Drives Section 2b/2c and checklist generation |
+| `has_one[]` | `has_one` relationships extracted from account attrs | Summarized in Section 2b constraint column |
+| `close_target` | Account receiving lamports on close | Cross-check in Section 2f recon notes |
+| `attributes` | Raw `#[account(...)]` attribute text | Source traceability only; do not dump verbatim in final tables |
 
----
+## Program-Level Fields
+
+| Field | Meaning | Report Usage |
+|---|---|---|
+| `data_structs[]` | Extracted account/data structs and fields | Section 3a |
+| `errors[]` | Extracted custom errors | Section 6 |
+| `flags[]` | Parser-generated signal candidates | Section 7 input |
+
+## Important Rendering Rules
+
+1. `flags[].severity` is parser metadata and is optional context only.
+2. Do not render a `Severity` or `Risk` column in Section 2.
+3. Section 7 uses the schema from `section-specs.md`:
+	- `# | Location | Signal | Evidence | Required Check | Source`
+4. If a field is missing, write:
+	- `Not extracted - verify manually.`
 

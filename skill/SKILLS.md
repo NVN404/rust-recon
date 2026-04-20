@@ -1,213 +1,119 @@
-# rust-recon Claude Skill — v2.2 (Self-Contained)
+# rust-recon Skill Runbook (v3.0, Strict Recon)
 
-This skill is a **complete runbook**. It installs the tool, runs it, and generates a
-deep security recon report — all from a single invocation.
+This skill is a deterministic runbook for generating protocol reconnaissance reports from
+`rust-recon` outputs.
 
-**Hard rules:**
-- Never hallucinate. Every claim must be traceable to a named field in `facts.json` or `summary.json`.
-- If a field is absent from the JSON, write `> Not extracted — verify manually.`
-- **ALL DIAGRAMS IN ASCII ART ONLY.** No Mermaid, no markdown flowcharts. Use boxes (┌─┐│└┘), lines (─│├┤┬┴┼), arrows.
+This workflow is recon-first, not vulnerability-rating-first.
 
----
+## Canonical Priority (Mandatory)
 
-## Step 0 — Prerequisites Check
+If instructions conflict, resolve by priority:
+1. `skill/core.md`
+2. `skill/references/section-specs.md`
+3. `skill/references/audit-patterns.md`
+4. `skill/references/cpi-rules.md`
+5. `skill/examples/*` (examples are non-authoritative)
 
-Before anything else, confirm:
+## Hard Rules
 
-1. You are inside a Solana Anchor project directory.
-2. `Anchor.toml` exists at the workspace root.
-3. Rust toolchain is installed (`rustc --version` should succeed).
+1. Follow execution steps in order and do not skip checks.
+2. Stop if prerequisites fail or required files are missing.
+3. Every claim must map to a field from:
+   - `.rust-recon/scope.json`
+   - `.rust-recon/facts.json`
+   - `.rust-recon/summary.json`
+4. If data is missing, write exactly:
+   - `Not extracted - verify manually.`
+5. Do not invent sections, headings, or table schemas.
+6. Do not use `Risk` or `Severity` columns in Section 2 tables.
+7. Do not use red/yellow/blue indicator emoji in findings.
+8. Diagrams in Section 4 must be ASCII only.
 
-If `Anchor.toml` is not found, stop and tell the user:
-> "This does not appear to be an Anchor workspace. Navigate to the project root and try again."
+## Step 0 - Prerequisites
 
----
+Confirm all of the following before running extraction:
+1. In Anchor workspace root
+2. `Anchor.toml` exists
+3. `rustc --version` succeeds
 
-## Step 1 — Install rust-recon
+If `Anchor.toml` is missing, stop and return:
+"This does not appear to be an Anchor workspace. Navigate to the project root and try again."
 
-Check if `rust-recon` is already installed:
+## Step 1 - Install rust-recon (if needed)
 
+Check:
 ```bash
 rust-recon --version
 ```
 
-If the command is not found, install from source:
-
+If missing:
 ```bash
-# Clone the repository
-git clone https://github.com/NVN404/rust-recon.git
-cd rust-recon
-
-# Build and install
+export TARGET_DIR=~/.rust-recon_tool
+if [ ! -d "$TARGET_DIR" ]; then
+  git clone https://github.com/NVN404/rust-recon.git "$TARGET_DIR"
+else
+  cd "$TARGET_DIR" && git pull
+fi
+cd "$TARGET_DIR"
 cargo install --path cli
-
-# Verify installation
 rust-recon --version
 ```
 
-If installation fails, report the exact cargo error to the user and stop.
-Do not proceed without a working `rust-recon` binary.
+Stop on install failure.
 
----
+## Step 2 - Generate Data
 
-## Step 2 — Generate Recon Data
-
-Navigate back to the Anchor project root (where `Anchor.toml` lives), then run:
-
+From project root:
 ```bash
-# Step 2a — scope extraction
 rust-recon scope
-
-# Step 2b — deep AST extraction
 rust-recon facts
 ```
 
-Expected outputs after both commands:
+Required outputs:
+- `.rust-recon/scope.json`
+- `.rust-recon/facts.json`
+- `.rust-recon/summary.json`
 
-```
-.rust-recon/
-  scope.json      ← program IDs, workspace members
-  facts.json      ← full AST extraction (instructions, accounts, PDAs, CPIs, flags)
-  summary.json    ← merged authority graph, PDA index
-```
+If any are missing, stop and report exact file(s).
 
-If any file is missing after running the commands, report which command failed and stop.
-Do not generate a partial report.
+## Step 3 - Read Context in Exact Order
 
----
+Read in this sequence:
+1. `skill/core.md`
+2. `skill/references/facts-schema.md`
+3. `skill/references/section-specs.md`
+4. `skill/references/audit-patterns.md`
+5. `skill/references/cpi-rules.md`
+6. `.rust-recon/scope.json`
+7. `.rust-recon/facts.json`
+8. `.rust-recon/summary.json`
 
-## Step 3 — Read All Three Files
+Do not use examples to infer schema.
 
-Read in this exact order before writing a single line of output:
+## Step 4 - Select Report Mode
 
-1. `.rust-recon/scope.json`
-2. `.rust-recon/facts.json`
-3. `.rust-recon/summary.json`
+- Default: `detailed`
+- Optional: `condensed` (only when user explicitly requests)
 
-Cross-reference: `facts.json` is ground truth. `summary.json` is derived.
-Any conflict → trust `facts.json`.
+No third mode is allowed.
 
----
+## Step 5 - Generate recon.md
 
-## Step 3.5 — Choose Report Format
+Write `recon.md` in project root with the exact 1-9 section order defined in `skill/core.md`.
 
-**Default: DETAILED FORMAT**
+Section 2 is mandatory per instruction with 2a through 2f in order.
 
-By default, generate the **DETAILED** report format with:
-- Full subsections for every instruction (2a, 2b, 2c, 2d, 2e, 2f)
-- Comprehensive parameter tables, constraint blocks, body checks, arithmetic analysis, audit notes
-- Rich ASCII architecture diagrams in Section 4 (4a Authority Graph, 4b Instruction Flow, 4c Account Dependencies)
-- Complete error code registry with cross-references
-- Full verification checklist
-- Minimum **400+ lines** of substantive content
-- **Use this for all production audits, GitHub publication, and security-critical projects**
+## Step 6 - Quality Gate (Fail Closed)
 
-**Optional: CONDENSED FORMAT**
+Before final output, all checks must pass:
+1. Sections 1-9 exist in exact order.
+2. Every instruction includes 2a, 2b, 2c, 2d, 2e, 2f.
+3. Section 2a header is exactly: `Param | Type | Notes`
+4. Section 2b header is exactly:
+   `Account | Type | Mut | Signer | Unchecked | Constraint Summary`
+5. Section 2e header is exactly: `Op | Style | Expression | Impact`
+6. No forbidden columns in Section 2 (`Risk`, `Severity`).
+7. Section 4 diagrams are ASCII with directional flow.
+8. Section 8 checklist has one item per line.
 
-If the user explicitly requests "condensed" or the codebase has **50+ instructions**, offer an alternative:
-- Instruction Surface as single summary **table** (1 row per instruction, not detailed subsections)
-- Sections 2a-2f collapsed to essential columns (role, critical checks, risk)
-- Same 9-section structure but compressed
-- Minimum **250 lines** of substantive content
-- **Use only for quick snapshots on very large codebases**
-
-**User Choice:**
-Before generating the report, confirm format preference. If the user does not specify, **default to DETAILED**.
-
-Example prompt to user:
-> "I'm ready to generate the recon report. This program has **[N]** instructions. 
-> 
-> Preferred format?
-> - **Detailed** (default): Full analysis, 400+ lines, all subsections, detailed diagrams
-> - **Condensed**: Summary table, 250+ lines, quick overview only
->
-> Answer 'detailed' or 'condensed' (or press Enter for detailed)."
-
----
-
-## Step 4 — Generate recon.md
-
-Apply **every section below in order**. Never skip a section.
-Write output to `recon.md` at the project root.
-- **DETAILED format:** Minimum 400+ lines of substantive content
-- **CONDENSED format:** Minimum 250 lines of substantive content
-
-## Step 4.5 — Mandatory Quality Gate
-
-Before returning the report, validate output quality. If any check fails, regenerate the affected section.
-
-### Diagram gate (Section 4)
-- 4a/4b/4c must be true ASCII diagrams with hierarchy and directional flow.
-- Flat rectangle + text list is invalid.
-- Each diagram must include at least 3 boxed nodes and 4 directional edges.
-
-### Checklist gate (Section 8)
-- One checklist item per line only.
-- Never concatenate multiple `[ ]` items in one paragraph.
-- Keep category grouping with blank lines between groups.
-- Deduplicate repeated checklist findings.
-
----
-
-## Prerequisites
-
-Confirm all three files exist before proceeding:
-
-| File | Generated by | Contains |
-|---|---|---|
-| `.rust-recon/scope.json` | `rust-recon scope` | Program IDs, workspace members |
-| `.rust-recon/facts.json` | `rust-recon facts` | Full AST extraction (v2 schema) |
-| `.rust-recon/summary.json` | `rust-recon facts` | Merged authority graph, PDA index |
-
-If any file is missing, stop and tell the user which command to run.
-
----
-
-## Output Contract
-
-**FORMAT: Default DETAILED (not condensed)**
-
-Write to `recon.md` at the project root.
-Follow **exactly** the section order below. Never skip a section.
-
-**DETAILED FORMAT (Default for production audits):**
-- Minimum **400+ lines** of substantive content
-- Full subsections 2a-2f for every instruction
-- Rich ASCII architecture diagrams in Section 4
-- Section 2c must use **Account Fact Cards** (not raw constraints dump)
-- Use tables for anything with 3+ entries
-- Use fenced code blocks for seeds, constraints, arithmetic expressions, and CPI signatures
-- **Use ASCII art for all diagrams** — NO Mermaid, NO markdown flowcharts
-
-### Section 2c Rule (Mandatory)
-- For each non-skipped account, emit a fact card with:
-  - `Validated by`
-  - `Mutation`
-  - `Gap` (only when meaningful)
-  - `Manual check`
-- Never paste raw constraint strings in 2c.
-- Skip cards for `system_program`, `rent`, `token_program`, `associated_token_program`.
-
-**CONDENSED FORMAT (Optional, only if user explicitly requests):**
-- Minimum **250 lines** of substantive content
-- Instruction Surface as single summary table
-- Simplified Section 4 diagrams
-- Compressed error code and checklist sections
-
-**Section order (must follow exactly):**
-1. Protocol Overview
-2. Instruction Surface (DETAILED: 2a-2f per instruction | CONDENSED: summary table)
-3. Account & PDA Catalogue
-4. Authority & Trust Model (DETAILED: 4a-4d rich ASCII diagrams | CONDENSED: simplified)
-5. Token & CPI Flows
-6. Error Code Registry
-7. Attack Surface Summary
-8. Manual Verification Checklist
-9. Recon Metadata (🔴 EXACT COUNTS only — no approximations)
-
----
-
-## Section Specification
-
----
-
+If any check fails, regenerate only failed sections and re-run gate.

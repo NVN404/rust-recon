@@ -1,90 +1,76 @@
-#### 2f. Audit Notes (mechanical — STRICT contradiction checking)
+## Audit Patterns (v3, Recon Notes)
 
-**🔴 MANDATORY CROSS-REFERENCE RULES:**
+This file defines mechanical checks for Section 2f and Section 3a.
 
-For EVERY account with `close_target` non-null, add this verification:
-1. Check the instruction's `attributes` for `close = <target>` macro
-2. Cross-check the instruction's name/behavior: Does it actually CLOSE the account?
-3. **If close_target exists BUT the instruction does NOT close the account → FLAG AS CONTRADICTION**
+Use concise recon notes with prefixes from section-specs:
+- `[fact]`
+- `[check]`
+- `[gap]`
 
-Example:
-```
-✅ CORRECT:
-  unstake_locked: close_target = user_stake → Instruction name is "unstake" ✓ Behavior is close ✓
+Do not use severity icons.
 
-❌ CONTRADICTION:
-  instant_unlock: close_target = user_stake → But instruction does NOT close account ✗ 
-  FLAG: "close_target declared but account NOT closed. Remove close = target or add closure logic."
-```
+## Section 2f - Recon Notes (Mechanical Rules)
 
----
+For each instruction, evaluate the checks below and emit only applicable bullets.
 
-**Check each condition and write a bullet only if true:**
+### Close Target Cross-Check (required)
 
-- `init_if_needed` in any account `attributes` → **Re-initialization risk.** Account `<name>` can be re-entered. Verify all fields are reset correctly on re-init. Cite the field from Section 3a that is most at-risk.
-- `close_target` is non-null **AND instruction name/behavior matches** → **Lamport drain target is `<close_target>`.** Verify this is a protocol-controlled account, not caller-supplied.
-- `close_target` is non-null **BUT instruction does NOT close** → 🔴 **CONTRADICTION: close_target declared but no account closure in instruction. Verify in source or remove macro.** This is a parser or logic error.
-- `unchecked == true` on any account → **`<name>` is `<wrapper_type>` (zero Anchor validation).** Every check is manual — confirm in body.
-- `uses_remaining_accounts == true` → **Unvalidated account injection surface.** Any account can be passed here.
-- `body_checks[]` is empty AND (`mut` accounts exist OR CPI calls exist) → **No extracted access control.** Either validation is in the macro layer only or is absent.
-- Any param with `overflow_risk: true` AND any `arithmetic[].style == "unchecked"` on a matching expression → **Unchecked arithmetic on overflow-risk param `<name>`.** Confirm `checked_*` or `saturating_*` used in full source.
-- `cpi_calls[]` contains a non-token program → **CPI to non-standard program `<program>`.** Verify address is validated at call site.
-- `has_one` chain on a mutable account with no signer → **Trust chain relies on `has_one = <field>`.** Confirm the field is set during `init` by an authorised signer and is immutable after.
-- `init` with `payer =` that is not the instruction's signer → **Payer manipulation risk.**
+For every account with `close_target != null`:
+1. Confirm `attributes` includes `close = <target>`.
+2. Verify instruction behavior actually performs closure.
+3. If `close_target` exists but behavior does not close, emit:
 
----
+`[gap] close_target declared for <account> but closure behavior is not evident; verify parser output and source logic.`
 
-#### 3a. Account Structs (Field-Level Analysis — STRICT)
+### Conditional Recon Notes
 
-**🔴 MANDATORY: Every struct must have a complete field table. NO exceptions.**
+Emit a note when condition is true:
 
-For each `#[account]` struct in `facts.json`, produce:
+1. `attributes` contains `init_if_needed`
+  - `[check] init_if_needed present on <account>; verify all state fields are reinitialized on re-entry.`
 
-**Struct Name: `<StructName>`**
+2. `unchecked == true`
+  - `[gap] <account> uses <wrapper_type>; verify owner/type/address constraints in macro or body.`
 
-| Field | Type | Tag | Notes |
-|---|---|---|---|
+3. `uses_remaining_accounts == true`
+  - `[gap] remaining_accounts is used; verify account filtering and program-owner checks before CPI/state writes.`
 
-**STRICT RULES for field extraction:**
-> If a field's inner type, default value, or constraint cannot be extracted, write:
-> `> Not extracted — verify manually in source.`
-> 
-> **FORBIDDEN:** Vague placeholders like "(verify in source)", "(verify curve formula...)", "(...)", "(storage details)", etc.
-> 
-> **CORRECT:** `| pricing_formula | bytes | [STORED] | > Not extracted — verify manually in source. |`
-> **WRONG:** `| (pricing state) | — | — | (verify curve formula...) |`
+4. `body_checks[]` is empty and (`mut` account exists or CPI exists)
+  - `[check] no extracted body checks; confirm invariants are fully enforced by account constraints or explicit guards.`
 
-**STRICT RULES for tagging (apply ALL that match):**
-- Field named `bump` → `[STORED BUMP]`
-- Field name contains `admin`, `owner`, `authority`, `signer`, `key` → `[AUTHORITY]`
-- Field type is `u64`/`u128`/`i64` and name contains `amount`, `balance`, `total`, `reserve`, `reward`, `fee`, `shares`, `stake`, `deposit` → `[NUMERIC ⚠ overflow]`
-- Field type is `i64`/`u64` and name contains `timestamp`, `slot`, `epoch` → `[TIMESTAMP ⚠ manipulation]`
-- Field type is `bool` and name contains `paused`, `frozen`, `active`, `enabled` → `[PAUSE FLAG]`
-- Field is a `Pubkey` that can be user-controlled (not immutable seed component) → `[PUBKEY ⚠ validation]`
-- Field name contains `debt`, `accrued`, `pending`, `claimable` → `[ACCOUNTING ⚠ reset]` (watch for re-stake/re-entry bypasses)
+5. Param has `overflow_risk: true` and matching arithmetic is `unchecked`
+  - `[gap] unchecked arithmetic path for numeric input <param>; verify checked/saturating math on this state transition.`
 
-**After every field table:**
-1. Write: **"Used by instructions:"** [list 2-3 key instructions]
-2. Write: **"Re-init safety:"** [PASS/FAIL] — For each `[NUMERIC]` and `[ACCOUNTING]` field, state whether it is **reset on re-init** or if `init_if_needed` can bypass. MUST verify in instruction body or mark as FAIL.
-3. Write: **"Authority chain:"** — Trace who can mutate this struct and via which instructions.
+6. CPI target appears non-standard for protocol flow
+  - `[check] CPI to <program>; confirm target address is fixed/validated and not caller-controlled.`
 
-**Example (GOOD):**
-```
-Struct Name: UserStake
+7. Mutable account relies on `has_one` but instruction has no signer on controlling role
+  - `[check] mutation trust chain depends on has_one mapping; verify mapped authority field is immutable after initialization.`
 
-| Field | Type | Tag | Notes |
-|---|---|---|---|
-| authority | Pubkey | [AUTHORITY] | Set during create, immutable after |
-| amount_staked | u64 | [NUMERIC ⚠ overflow] | Checked arithmetic on deposit |
-| rewards_debt | u64 | [ACCOUNTING ⚠ reset] | Reset on unstake; risk: init_if_needed could bypass |
-| locked_until | u64 | [TIMESTAMP ⚠ manipulation] | Clock-based, not user-supplied |
+8. `init` payer is not an obvious signer in instruction context
+  - `[check] init payer differs from expected signer; verify payer cannot be redirected by user input.`
 
-Used by instructions: stake_liquid, claim_rewards, unstake_liquid
+## Section 3a - Field-Level Analysis Rules
 
-Re-init safety: FAIL — init_if_needed on this account allows re-entry without resetting rewards_debt. Exploit: Call stake → claim → re-stake via same account → rewards counted twice.
+Every struct in `data_structs[]` must include a full field table.
 
-Authority chain: user (signer) creates → user can mutate via stake/unstake → operator CANNOT mutate.
-```
+If extraction is incomplete, write exactly:
+- `Not extracted - verify manually.`
 
----
+### Tagging Rules (apply all matches)
+
+1. Field name `bump` -> `[STORED_BUMP]`
+2. Name contains `admin|owner|authority|signer|key` -> `[AUTHORITY]`
+3. Numeric field (`u64|u128|i64`) with name containing `amount|balance|total|reserve|reward|fee|shares|stake|deposit` -> `[NUMERIC]`
+4. Time-like field (`i64|u64`) with `timestamp|slot|epoch` in name -> `[TIMESTAMP]`
+5. Bool field with `paused|frozen|active|enabled` in name -> `[PAUSE_FLAG]`
+6. `Pubkey` field not clearly immutable seed component -> `[PUBKEY]`
+7. Name contains `debt|accrued|pending|claimable` -> `[ACCOUNTING]`
+
+### Post-Table Required Lines
+
+After each struct table include:
+1. `Used by instructions:` list relevant instructions.
+2. `Re-init safety:` `PASS` or `FAIL` with one concrete sentence.
+3. `Authority chain:` who can mutate and through which instructions.
 

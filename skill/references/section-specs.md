@@ -19,359 +19,441 @@ Write:
 
 ---
 
-### 2. Instruction Surface
+## 2. Instruction Surface Format (FINAL SPEC)
 
-For **every** instruction in `facts.json`, produce a subsection `#### <InstructionName>`.
+Every instruction gets this EXACT layout in this EXACT order.
+No exceptions. No condensing. No skipping subsections.
 
 ---
 
-#### 2a. Parameter Table
+### INSTRUCTION HEADER (required for every instruction)
 
-If `params[]` is non-empty:
+```
+---
+### 2.N — `instruction_name`
+> **Context:** `ContextStructName` | **Signers:** N | **Accounts:** N | **Flags:** N
+---
+```
 
-| Param Name | Type | Overflow Risk |
+This one-line summary gives the reader instant orientation before diving into detail.
+
+---
+
+### 2a — Parameter Table
+
+If params exist:
+
+| Param | Type | Overflow |
 |---|---|---|
+| `amount` | `u64` | ⚠ Yes |
+| `is_enabled` | `bool` | ✅ No |
 
-Mark `overflow_risk: true` entries in the Overflow Risk column as ⚠ Yes.
-If `params[]` is empty: `> No function-level parameters extracted.`
-
----
-
-#### 2b. Signature Table
-
-| Field | Value |
-|---|---|
-| Accounts consumed | all account names for this instruction |
-| Signers required | accounts where `wrapper_type == "Signer"` |
-| Unchecked accounts | accounts where `unchecked == true` — list with inner type |
-| Mutable accounts | accounts with `mut` in `attributes` |
-| Init accounts | accounts with `init` or `init_if_needed` in `attributes` |
-| Close targets | `<account> → <close_target>` for any non-null `close_target` |
-| has_one chains | `<account>.has_one = [...]` for every account with non-empty `has_one` |
-| CPI calls made | `<program>::<method>` — from `cpi_calls[]` |
-| Events emitted | from `events_emitted[]` |
-| Remaining accounts | `uses_remaining_accounts` value |
-| Error codes | `error_codes_referenced[]` |
-
-**STRICT RULE for Signers Required:**
-> **Signer extraction rule:** If `wrapper_type == "Signer"`, the account IS a signer. Do NOT rely on 
-> Constraints or close_target to infer signer status — the wrapper_type field is ground truth.
-> If `close_target` is set on a Signer, verify it is the payer/signer themselves (not privilege escalation).
+If no params: `> No parameters.`
 
 ---
 
-#### 2c. Constraint Block
+### 2b — Account Table (READABLE FORMAT — this is what was missing)
 
-Reproduce every account's raw `attributes` string verbatim:
+Use this table format. Every account gets one row. Columns are scannable.
+
+| Account | Type | Mut | Signer | Unchecked | Constraint Summary |
+|---|---|:---:|:---:|:---:|---|
+| `config` | `Account<Configuration>` | ❌ | ❌ | ❌ | `seeds=[CONFIG_PDA_SEED], bump` |
+| `owner` | `Signer` | ✅ | ✅ | ❌ | `mut, address = config.owner` |
+| `fee_recipient` | `AccountInfo` | ✅ | ❌ | ⚠️ | `mut, address = config.fee_recipient` |
+| `moderator_config` | `Account<ModeratorState>` | ❌ | ❌ | ❌ | `init_if_needed, seeds=[MISSIONX_MODERATOR, moderator.key]` |
+
+RULES for this table:
+- `Type` column: strip lifetimes, keep struct name. `Box<Account<'info, Configuration>>` → `Account<Configuration>`
+- `Mut` column: ✅ if `mut` in constraint, ❌ otherwise
+- `Signer` column: ✅ if `wrapper_type == Signer`, ❌ otherwise  
+- `Unchecked` column: ⚠️ if `AccountInfo` or `UncheckedAccount`, ❌ otherwise
+- `Constraint Summary` column: extract the KEY constraint only — seeds, address check, has_one, init type. NOT the full raw string.
+
+---
+
+### 2c — Account Fact Cards
+
+For every account in the instruction, produce one fact card using this format:
+
+**`account_name`** [`AccountType`] — `one-line role description (inference)`
+- **Validated by:** list every validation present (seeds, address check, has_one,
+  associated_token derivation, executable check) or `None` if absent
+- **Mutation:** Mutable / Immutable / Init / Close
+- **Gap:** what Anchor does NOT check (ownership, type, value range)
+- **Manual check:** one specific thing to verify in source
+
+RULES:
+- `Validated by: None` is a meaningful finding. Write it explicitly.
+- `Gap` is written only when a meaningful security check is missing.
+- Role description is inferred from account name + context and must be labeled inference.
+- Never reproduce the raw constraint string. Extract meaning into facts.
+- Skip fact cards for: `system_program`, `rent`, `token_program`, `associated_token_program`.
+
+Example fact cards:
+
+**`bonding_curve`** [`Account<BondingCurve>`] — Mutable state PDA for reserves (inference)
+- **Validated by:**
+  - ✅ PDA seeds: `["bonding_curve", mint.key()]`
+  - ✅ Cross-check: `bonding_curve.market == market.key()`
+  - ✅ Bump present
+- **Mutation:** Mutable
+- **Gap:** No `has_one` or `close` constraint extracted
+- **Manual check:** Verify bump is canonical and not accepted from unchecked input
+
+**`trading_fee_treasury`** [`AccountInfo`] — Fee recipient account for trades (inference)
+- **Validated by:**
+  - ⚠️ Address match only: `market.trading_fee_treasury == key()`
+- **Mutation:** Mutable
+- **Gap:** `AccountInfo` wrapper means Anchor does not enforce owner/type checks
+- **Manual check:** Confirm `market.trading_fee_treasury` is immutable after initialization
+
+**`buyer`** [`Signer`] — Transaction authority for user trade (inference)
+- **Validated by:**
+  - ✅ Runtime signer verification
+- **Mutation:** Mutable (lamports)
+- **Gap:** No address-binding constraint; any signer can call
+- **Manual check:** Confirm no privileged operation relies only on this signer
+
+**`mint`** [`Account<Mint>`] — Token mint reference for curve operations (inference)
+- **Validated by:** `None`
+- **Mutation:** Immutable
+- **Gap:** Unconstrained mint can be substituted unless checked in body/linked account constraints
+- **Manual check:** Verify mint is tied to expected market/curve state in instruction logic
+
+---
+
+### 2d — Body Checks
+
+If body_checks exist, use this format — one line per check, emoji prefix:
 
 ```
-<AccountName>  [<wrapper_type><inner_type>]
-  <attributes string>
-  has_one: [...]
-  close_target: <value or null>
+🔒 require!(config.initialized == false)  →  AlreadyInitialized
+🔒 require!(payout >= config.missionx_payout_min)  →  MissionxPayoutTooSmall
+🔒 require!(clock.unix_timestamp <= state.open_timestamp + state.open_duration)  →  MissionxFailedByExpiration
+```
+
+If no body checks:
+```
+⚠️ No require! checks extracted. Verify access control manually in function body.
 ```
 
 ---
 
-#### 2d. Body Checks
+### 2e — Arithmetic Analysis
 
-If `body_checks[]` is non-empty, produce a table:
+If arithmetic exists:
 
-| Macro | Condition / LHS | RHS (keys_eq only) | Error Code |
+| Op | Style | Expression | Risk |
 |---|---|---|---|
+| `add` | ⚠ unchecked | `reserve0 + effective_sol_spend` | Overflow on reserve accumulation |
+| `sub` | ⚠ unchecked | `migration_threshold - reserve0` | Underflow if threshold < reserve |
+| `div` | ⚠ unchecked | `checked_mul(...) / BPS` | Div after checked_mul — still unsafe |
+| `mul` | ✅ checked | `effective_sol_spend.checked_mul(trade_fee_bps)` | Safe |
 
-If `body_checks[]` is empty:
-> ⚠ No `require!` checks extracted for this instruction. Verify manually that
-> access control is enforced in the function body.
+RULES:
+- Expression column: truncate to 60 chars max, keep the meaningful part
+- Risk column: one specific sentence about what breaks, not generic "overflow risk"
+- Style: `✅ checked`, `⚠ unchecked`, `⚠ wrapping`, `✅ saturating`
+
+If no arithmetic AND u64 params or token transfers present:
+```
+⚠️ No arithmetic extracted but u64 params / token transfers present.
+   Verify: checked_add/sub/mul used in function body.
+```
+
+If no arithmetic and no numeric risk:
+```
+> No arithmetic operations.
+```
 
 ---
 
-#### 2e. Arithmetic Analysis
+### 2f — Audit Notes (SPECIFIC, not generic)
 
-If `arithmetic[]` is non-empty, produce a table:
+This section is the analyst's voice. Each bullet must be instruction-specific.
 
-| Operation | Style | Expression | Overflow Risk |
+FORMAT RULES:
+- 🔴 = critical, immediate exploit risk
+- 🟠 = high, likely exploitable  
+- 🟡 = medium, conditional risk
+- ✅ = positive finding worth noting
+- ⚠️ = needs manual verification
+
+FORBIDDEN phrases (too generic, must never appear):
+- "UncheckedAccount — zero Anchor validation"  ← replace with specific exploit
+- "Verify manually"  ← replace with what specifically to verify
+- "Overflow risk"  ← replace with which field and what breaks
+- "Missing access control"  ← replace with what attacker can do without it
+
+REQUIRED format for each flag:
+```
+🔴 `fee_recipient` is AccountInfo (mut, unchecked) — attacker passes own wallet
+   as fee_recipient → ALL trading fees in every buy() redirect to attacker permanently.
+   Protocol loses 100% of fee revenue. Verify Market.fee_recipient is validated
+   against config.fee_recipient before any system::transfer.
+
+🟡 `init_if_needed` on `moderator_config` — if moderator is re-added after removal,
+   ModeratorState.is_enabled resets. Verify function body sets is_enabled = enable_moderator
+   explicitly, not relying on zero-init default.
+
+✅ `has_one = admin @ UnauthorizedAdmin` on config — only admin keypair can call this.
+   Clean access control, no escalation path identified.
+
+⚠️ `accept_missionx_multi` has no body checks extracted but shares context struct
+   with `accept_missionx` (which has expiration check). Verify multi version also
+   enforces open_timestamp + open_duration deadline — silent omission is a bug.
+```
+
+---
+
+## COMPLETE INSTRUCTION EXAMPLE (copy this format exactly)
+
+---
+### 2.12 — `buy`
+> **Context:** `BuyAccounts` | **Signers:** 1 (user) | **Accounts:** 9 | **Flags:** 5
+---
+
+#### 2.12a Parameters
+| Param | Type | Overflow |
+|---|---|---|
+| `buy_amount` | `u64` | ⚠ Yes |
+| `pay_cap` | `u64` | ✅ No |
+
+#### 2.12b Accounts
+| Account | Type | Mut | Signer | Unchecked | Constraint Summary |
+|---|---|:---:|:---:|:---:|---|
+| `user` | `Signer` | ✅ | ✅ | ❌ | `mut` |
+| `config` | `Account<Configuration>` | ❌ | ❌ | ❌ | `seeds=[CONFIG_PDA_SEED], bump` |
+| `missionx_state` | `Account<Missionx>` | ✅ | ❌ | ❌ | `mut, seeds=[MISSIONX_STATE, token_mint.key]` |
+| `fee_recipient` | `AccountInfo` | ✅ | ❌ | ⚠️ | `mut, address=config.fee_recipient` |
+| `token_mint` | `InterfaceAccount<Mint>` | ✅ | ❌ | ❌ | `mut, address=missionx_state.token_mint` |
+| `token_program` | `AccountInfo` | ❌ | ❌ | ⚠️ | `executable, address=missionx_state.token_program` |
+| `token_vault_pda` | `InterfaceAccount<TokenAccount>` | ✅ | ❌ | ❌ | `mut, seeds=[MISSIONX_TOKEN_VAULT, token_mint.key, missionx_state.key]` |
+| `user_ata` | `InterfaceAccount<TokenAccount>` | ✅ | ❌ | ❌ | `mut, authority=user, mint=token_mint` |
+| `system_program` | `Program<System>` | ❌ | ❌ | ❌ | — |
+
+#### 2.12c Account Fact Cards
+
+**`user`** [`Signer`] — User-authorized caller for buy path (inference)
+- **Validated by:** ✅ Runtime signer verification
+- **Mutation:** Mutable
+- **Manual check:** Confirm no admin-only settings are reachable from this signer path
+
+**`config`** [`Account<Configuration>`] — Global protocol configuration (inference)
+- **Validated by:** ✅ PDA seeds + bump: `[CONFIG_PDA_SEED]`
+- **Mutation:** Immutable
+- **Manual check:** Verify config fields used in pricing are not stale or spoofable
+
+**`missionx_state`** [`Account<Missionx>`] — Trade state and reserve context (inference)
+- **Validated by:** ✅ PDA seeds + bump: `[MISSIONX_STATE, token_mint.key]`
+- **Mutation:** Mutable
+- **Manual check:** Verify seed source and account key are canonical for this market
+
+**`fee_recipient`** [`AccountInfo`] — Fee sink destination (inference)
+- **Validated by:** ⚠️ Address-only match: `config.fee_recipient`
+- **Mutation:** Mutable
+- **Gap:** `AccountInfo` does not enforce owner/type checks
+- **Manual check:** Confirm config update path cannot redirect fees without admin authorization
+
+**`token_mint`** [`InterfaceAccount<Mint>`] — Mint used in transfer and vault checks (inference)
+- **Validated by:** ✅ Address match: `missionx_state.token_mint`
+- **Mutation:** Mutable
+- **Manual check:** Confirm mint authority and decimals assumptions in pricing logic
+
+**`token_program`** [`AccountInfo`] — Token execution program account (inference)
+- **Validated by:** ✅ Executable + address match: `missionx_state.token_program`
+- **Mutation:** Immutable
+- **Gap:** `AccountInfo` wrapper does not enforce concrete program type
+- **Manual check:** Confirm state initialization cannot set a malicious token program address
+
+**`token_vault_pda`** [`InterfaceAccount<TokenAccount>`] — Program-controlled token vault (inference)
+- **Validated by:**
+  - ✅ PDA seeds + bump: `[MISSIONX_TOKEN_VAULT, token_mint.key, missionx_state.key]`
+  - ✅ Token constraints: authority = `missionx_state`, mint = `token_mint`, token_program = `token_program`
+- **Mutation:** Mutable
+- **Manual check:** Verify vault authority never escapes PDA control
+
+**`user_ata`** [`InterfaceAccount<TokenAccount>`] — User token receiving account (inference)
+- **Validated by:** ✅ ATA derivation: authority = `user`, mint = `token_mint`, token_program = `token_program`
+- **Mutation:** Mutable
+- **Manual check:** Confirm ATA is used consistently for transfer destination
+
+Skipped in 2c by rule: `system_program` (standard program account)
+
+#### 2.12d Body Checks
+```
+🔒 require!(effective_sol_spend <= pay_cap)  →  SlippageLimit
+```
+
+#### 2.12e Arithmetic
+| Op | Style | Expression | Risk |
 |---|---|---|---|
+| `add` | ⚠ unchecked | `reserve0 + effective_sol_spend` | reserve0 can overflow if buys accumulate near u64::MAX |
+| `sub` | ⚠ unchecked | `migration_threshold - reserve0` | underflow if reserve0 > migration_threshold (post-migration state) |
+| `div` | ⚠ unchecked | `checked_mul(trade_fee_bps) / BPS` | integer division after checked mul — result still truncates |
+| `mul` | ✅ checked | `effective_sol_spend.checked_mul(trade_fee_bps)` | Safe |
 
-Style values: `checked` ✅, `unchecked` ⚠, `saturating` ✅, `wrapping` ⚠.
+#### 2.12f Audit Notes
+- 🔴 `fee_recipient` is AccountInfo (unchecked, mut) — though `address = config.fee_recipient`
+  validates the key, AccountInfo wrapping means Anchor does NOT check ownership or type.
+  If `config.fee_recipient` can be updated via `set_options`, attacker who compromises
+  owner key redirects ALL buy fees by changing config first.
 
-If `arithmetic[]` is empty and the instruction has `u64` params or token transfers:
-> ⚠ No arithmetic extracted but numeric params or token transfer present.
-> Verify overflow handling manually.
+- 🔴 `token_program` is AccountInfo (unchecked) — `address = missionx_state.token_program`
+  validates address but not program type. If missionx_state.token_program can be set to
+  a malicious program address at create_missionx time, ALL token CPIs in buy() execute
+  against attacker-controlled code.
+
+- 🟠 Unchecked arithmetic on `reserve0 + effective_sol_spend` — bonding curve reserve
+  has no overflow guard. At extreme buy volumes, reserve0 wraps to 0, breaking all
+  subsequent price calculations. Add `checked_add` or `saturating_add`.
+
+- 🟠 Unchecked `migration_threshold - reserve0` — if called after migration_threshold
+  is lowered via set_options while reserve0 is high, subtraction underflows.
+  Verify this expression only executes when reserve0 < migration_threshold.
+
+- ✅ Slippage guard `pay_cap` is enforced before any state mutation. User cannot
+  be front-run beyond their declared tolerance.
+
+- ✅ `token_vault_pda` uses full PDA derivation with token::authority = missionx_state —
+  vault authority is program-controlled, not user-supplied.
+
+---
+
+## ENFORCEMENT RULE FOR SKILL
+
+SELF-CHECK before writing any instruction section:
+1. Does the account table have ✅/❌/⚠️ columns? If not → redo
+2. Does 2f have specific exploit paths, not generic phrases? If not → redo  
+3. Is every unchecked account flagged with a concrete attack scenario? If not → redo
+4. Are arithmetic risks named (which field, what breaks) not just "overflow risk"? If not → redo
 
 ---
 
 ### 3. Account & PDA Catalogue
 
-#### 3b. PDA Catalogue
+#### 3a Account Structs
+Per struct from `data_structs[]`:
+Table: `| Field | Type | Tag | Notes |`
+Include Re-init safety analysis and Authority chain.
 
-| PDA Name | Seeds (verbatim) | Bump Storage Field | Derived In |
-|---|---|---|---|
-
-After the table, for every PDA where seeds contain a `Pubkey` field or user key:
-
-> ⚠ **Seed Analysis — `<PDA>`:** Seed component `<X>` is caller-supplied (type `Pubkey`).
-> Verify the instruction validates `<X>` against an on-chain authoritative source before
-> treating this PDA as a security boundary.
+#### 3b PDA Catalogue
+Table: `| PDA Name | Seeds (verbatim) | Bump Storage Field | Derived In |`
+Followed by **PDA Security Analysis**.
 
 ---
 
 ### 4. Authority & Trust Model
 
 **🔴 CRITICAL: ASCII Diagrams Must Be RICH & DETAILED**
+This section must use sophisticated ASCII art with boxes (┌─┐│└┘), lines (─│├┤┬┴┼), and arrows (▼, ►, ◄).
 
-Section 4 is the heart of the security analysis. Use sophisticated ASCII art with:
-- Multi-level hierarchies (not just flat lists)
-- Role → Account → PDA → Field relationships (full nesting)
-- Trust chains with explicit flow labels
-- Branching for multiple control paths
-- Seed component callouts
-- Authority tag callouts [AUTHORITY], [NUMERIC], [TIMESTAMP], etc.
+HARD ENFORCEMENT (non-optional):
+- Do NOT output a single flat rectangle with text rows (this is invalid).
+- Every diagram in 4a/4b/4c must contain at least:
+  1) 3 or more boxed nodes
+  2) 4 or more directional arrows
+  3) 2 or more hierarchy levels (top actor/state -> child instruction/account)
+- Show trust flow, not just lists. A reader must see source -> control edge -> target.
+- If the current diagram can be converted to a table without losing information, it is too flat and must be redrawn.
 
-These diagrams go into GitHub and client reports. Make them publication-ready.
-
-#### 4a. Authority Graph (ASCII Art)
-
-**Purpose:** Show who controls what, and how trust flows through the protocol.
-
-Build from `has_one` chains + `Signer` wrapper types using ASCII box/line art.
-
-Example structure (adapt to your program):
-
-```
-       ┌────────────────────┐
-       │   owner (Signer)   │
-       └────────┬───────────┘
-                │
-       ┌────────▼──────────────┐
-       │  config (init)        │
-       │  [AUTHORITY]          │
-       └────────┬──────────────┘
-                │
-      ┌─────────┼─────────┐
-      │         │         │
-   ┌──▼──┐  ┌──▼──┐  ┌──▼───┐
-   │ tx1 │  │ tx2 │  │ tx3  │
-   └─────┘  └─────┘  └──────┘
+#### 4a Authority Graph (ASCII Art)
+Show who controls what, and how trust flows through the protocol mappings from actors down to specific instructions and derived accounts. Example:
 ```
 
-Rules:
-- Each role/account is a box.
-- Arrows (─→ or ├─→) show "controls" or "mutates" relationships.
-- Label edges with instruction names.
-- If a role controls multiple targets, use branching.
-
-If < 2 signers: use prose instead.
-
-#### 4b. Instruction Flow Diagram (ASCII Art)
-
-Show instruction dependencies and state transitions using boxes and arrows.
-
-Example structure:
-
-```
-    ┌─────────────┐
-    │   init()    │
-    │  (config)   │
-    └──────┬──────┘
-           │
-    ┌──────▼──────────┐
-    │ create_mission()│
-    │   (mission PDA) │
-    └──────┬──────────┘
-           │
-    ┌──────▼────────────┐
-    │ accept_mission()  │
-    │ (participant PDA) │
-    └──────┬────────────┘
-           │
-    ┌──────▼──────────┐
-    │ complete_ix()   │
-    │   (settlement)  │
-    └─────────────────┘
+Minimum content requirements for 4a:
+- One trust boundary header block.
+- Separate actor lane and protocol state lane.
+- Explicit edges from each signer role to controlled instructions.
+- Explicit edges from controlled instructions/roles to state accounts or PDAs.
+- Call out all unchecked-account trust edges in a dedicated block.
+┌──────────────────────────────────────────────────────────────┐
+│                 PROTOCOL TRUST BOUNDARIES                    │
+└──────────────────────────────────────────────────────────────┘
+  [ Actor: OWNER ]
+   │
+   ├──➤ init()
+   └──➤ set_options()
 ```
 
-Show:
-- Prerequisites (e.g., "init before create").
-- State machine transitions.
-- Grouped stages (setup, execution, settlement).
+#### 4b Instruction Flow Diagram (ASCII Art)
+Show instruction dependencies and state transitions (Setup Phase, Trading/Execution Phase, Completion) using ASCII boxes and arrows.
 
-#### 4c. Account Dependency Diagram (ASCII Art)
+Minimum content requirements for 4b:
+- Three phase boxes: setup, execution/trading, completion.
+- One directional path between phases.
+- At least one loop or bidirectional edge where protocol behavior is cyclical.
+- Do not compress all phases into one vertical list.
 
-Show which account structs depend on which via PDA seeds or `has_one` links.
+#### 4c Account Dependency Diagram (ASCII Art)
+Show which account structs depend on which via PDA seeds or `has_one` links in an ASCII tree/hierarchy.
 
-Example structure (use boxes and nesting):
+Minimum content requirements for 4c:
+- Show seed source nodes (for example mint/version inputs) feeding into PDA derivation nodes.
+- Show at least one constraint edge (for example has_one / market equality relation).
+- Show downstream token-account linkage for movement paths.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    config (root)                        │
-│            [AUTHORITY, owner, executor, ...]           │
-└──────────────────┬──────────────────────────────────────┘
-                   │
-        ┌──────────┼──────────┐
-        │          │          │
-    ┌───▼──┐   ┌───▼──┐   ┌──▼────┐
-    │mission│   │ pool │   │ vault │
-    │ (PDA) │   │(PDA) │   │(PDA)  │
-    └───┬──┘   └───┬──┘   └──┬───┘
-        │          │         │
-    ┌───▼──────────▼─────────▼──┐
-    │  participant / user_stake │
-    │  (per-user account PDAs)  │
-    └──────────────────────────┘
-```
-
-Rules:
-- Root account (authority) at top.
-- Each PDA seed component listed in relevant box.
-- Nesting shows derivation hierarchy.
-- Use `[TAGS]` from section 3a inline in boxes.
-
-#### 4d. Trust Assumption Table
-
-| Role | Controls | Assumed Honest | Privilege Escalation Path |
-|---|---|---|---|
-
-Trace `has_one` chains for escalation paths. Write `None identified` only after
-checking every chain explicitly.
-
-Flag if found:
-- Single role controls pause flag AND treasury/vault → Centralisation risk.
-- No time-lock, multi-sig, or DAO pattern in any account fields → Single point of failure.
-- Admin is payer on multiple `init` instructions → Can grief protocol.
+#### 4d Trust Assumption Table
+| Role | Controls | Assumed Honest | Privilege Escalation Path | Risk |
+|---|---|---|---|---|
+List all authorities and outline single-points of failure.
 
 ---
 
 ### 5. Token & CPI Flows
 
-#### 5a. Token Account Table
+#### 5a Token Account Flow Table
+| Account Name | Mint | Authority | Balance Role | Instructions | Flow |
+|---|---|---|---|---|---|
 
-| Account Name | Mint | Authority | Direction | Instructions |
-|---|---|---|---|---|
+#### 5b CPI Call Map (ASCII Art)
+Include a graphical mapping of Explicit CPI calls and Implicit Token Operations (via vault mutations).
 
-Direction: `source` if this account is debited in a CPI transfer/burn,
-`dest` if credited in transfer/mint_to, `both` if appears in both roles.
-Infer from `cpi_calls[].method` and account position.
+#### 5c Token-2022 Compatibility
+Assess compatibility and potential vectors (e.g. fee-on-transfer).
+
+---
 
 ### 6. Error Code Registry
-
-| Code | Name | Message | Instructions That Reference It |
-|---|---|---|---|
-
-Populate "Instructions That Reference It" from `error_codes_referenced[]` across all instructions.
-
-After the table:
-- Any error code with zero instructions referencing it → **Dead error code.** Either unused or
-  referenced only in body code not yet extracted — verify manually.
-- Any instruction with `u64` params or numeric arithmetic and no arithmetic-related error code
-  (`Overflow`, `Underflow`, `InvalidAmount`) → **Missing overflow error coverage.**
-- Any instruction with token transfers and no slippage/amount error code → **Missing slippage guard.**
+Table: `| Code | Name | Message | Instructions That Reference It |`
+Followed by expectations and audit findings regarding missing error coverage.
 
 ---
 
 ### 7. Attack Surface Summary
-
-**Import the pre-computed `flags[]` array from `facts.json` directly.**
-Translate each flag entry into one table row. Do not re-derive — the extractor already did this.
-
-Then add any flags raised in Sections 2–6 that are not already in `flags[]`
-(e.g. trust model observations, dead error codes, missing arithmetic errors).
-
-| # | Location | Finding | Severity | Source |
-|---|---|---|---|---|
-
-Severity scale:
-- 🔴 **Critical** — missing signer on state mutation, arbitrary CPI, re-init on privileged account, unchecked account on vault.
-- 🟠 **High** — unchecked arithmetic on reserve/balance field, user-controlled PDA seed unvalidated, oracle with no cap.
-- 🟡 **Medium** — `init_if_needed` on non-privileged account, `close` to potentially caller-controlled target, single admin centralisation.
-- 🔵 **Low/Info** — dead error codes, missing Token-2022 `transfer_checked`, no time-lock pattern, missing events.
-
-Always append:
-> *Severity ratings are triage hints from static structure only. Confirm exploitability
-> with manual review and a working PoC before reporting.*
+Import the pre-computed `flags[]` array from `facts.json` directly. Translate each into a row.
+| # | Location | Finding | Severity | Source | Exploit Path |
+|---|---|---|---|---|---|
 
 ---
 
 ### 8. Manual Verification Checklist
-
-Generate this list from **gaps in the extracted data** — not from a generic template.
-For each gap, name the specific instruction and field.
-
-Format:
+Generate this list dynamically from **gaps in the extracted data**.
+Format using categorizations:
 ```
-[ ] <Instruction>: Verify <X> — rust-recon could not extract <Y> from <location>
+CRITICAL SECURITY VERIFICATIONS:
+═════════════════════════════════
+[ ] <Instruction>: Missing body checks — verify bounds and logic
+[ ] <Account>: Zero-constraint UncheckedAccount — verify payload
+
+ADDITIONAL AUDIT ITEMS:
+═══════════════════════
+[ ] <Struct>::<Field>: Tagged [TIMESTAMP ⚠ manipulation] — verify dependencies
 ```
 
-Auto-generate the following checks when the condition is true:
-
-| Condition | Checklist Item |
-|---|---|
-| `unchecked == true` on any account | `[ ] <Ix>/<Account>: Confirm manual validation in function body` |
-| `body_checks[]` empty + CPI present | `[ ] <Ix>: Confirm access control logic exists in body — no require! extracted` |
-| `uses_remaining_accounts == true` | `[ ] <Ix>: Enumerate expected remaining_accounts and their validation` |
-| `arithmetic[]` empty + `u64` param | `[ ] <Ix>: Audit arithmetic on <param> — no operations extracted` |
-| Any `timestamp` or `slot` field | `[ ] <Struct>: Verify clock manipulation resistance for <field>` |
-| Token accounts + no `transfer_checked` | `[ ] <Ix>: Confirm Token-2022 compatibility if mint is upgradeable` |
-| `events_emitted[]` empty on state-mutating ix | `[ ] <Ix>: No events emitted — consider whether indexers can observe this state change` |
+READABILITY ENFORCEMENT (non-optional):
+- One checklist item per line. Never join multiple [ ] items into a paragraph.
+- Insert one blank line between category headers and their checklist items.
+- Keep each checklist line concise; target <= 140 characters per line.
+- Group checklist items in this exact order:
+  1) Missing body checks per instruction
+  2) Unchecked account wrappers
+  3) Arithmetic risk checks
+  4) Struct-field risk tags
+- Duplicate signals must be deduplicated (same instruction + same risk appears once).
 
 ---
 
 ### 9. Recon Metadata
-
-```
-Tool             : rust-recon v2
-Generated        : <timestamp>
-Source files     : .rust-recon/scope.json, facts.json, summary.json
-Instructions     : <N>
-Account structs  : <N>
-PDAs             : <N>
-CPI calls        : <N>
-Error codes      : <N>
-Pre-computed flags (extractor) : <N>
-Flags total (report)           : <N>
-```
-
-> **EXACT COUNTS RULE:** All metadata counts must be exact integers. Do NOT use approximations like `11+`, `35+`, `8+`, or `~`. Count directly from `facts.json` arrays or enumerate manually. Every number must be precise.
-
----
-
-## Generation Rules (Final)
-
-1. **Never hallucinate.** No field, account, instruction, or constraint that is not in the JSON.
-2. **Verbatim seeds and attributes.** Reproduce PDA seed arrays and `#[account(...)]` strings exactly.
-3. **No generic filler.** Every sentence must name a specific account, instruction, field, or expression from the data.
-4. **`flags[]` is imported, not re-derived.** Paste extractor flags into Section 7 first, then add report-level observations.
-5. **`body_checks[]` absence is a finding.** An instruction with no extracted `require!` calls and mutable state is a gap — flag it.
-6. **`arithmetic[]` absence + numeric params = manual check item.** Always.
-7. **🔴 ASCII art diagrams ONLY in Section 4** — **NO Mermaid, NO markdown flowcharts**. Use boxes (┌─┐│└┘), lines (─│├┤┬┴┼), arrows (→↓). Make diagrams **RICH and DETAILED** with:
-   - Section 4a: **Authority Graph** showing all roles, trust chains, control flows (not just simple boxes)
-   - Section 4b: **Instruction Flow Diagram** with prerequisites, state transitions, grouped stages
-   - Section 4c: **Account Dependency Diagram** with hierarchy, nesting, PDA seed components, [TAGS]
-8. **Tables over lists** for anything with ≥ 3 entries.
-9. **🔴 EXACT COUNTS RULE (Critical):** All numeric metadata in Section 9 and throughout the report must be **exact integers**. 
-   - ✅ DO use: "17 instructions", "21 error codes", "70 arithmetic operations"
-   - ❌ DON'T use: "11+", "35+", "8+", "~", or any approximations
-   - Count directly from `facts.json` arrays or enumerate manually
-   - Every number must be precise and traceable to source data
-10. **DETAILED format is production-ready** — use as default. Condensed format only when explicitly requested for 50+ instruction codebases.
-
----
-
-## Full Invocation Summary
-
-```bash
-# 1. Install (skip if already installed)
-git clone https://github.com/0xkingx/rust-recon.git
-cd rust-recon
-cargo install --path cli
-cd <back to your anchor project>
-
-# 2. Generate data
-rust-recon scope
-rust-recon facts
-
-# 3. Tell Claude:
-# "Run the rust-recon skill against this project."
-# Claude reads .rust-recon/*.json and writes recon.md
-```
-```
+Provide exact deterministic metrics for instructions analyzed, context structs modeled, CPIs traced, risks flagged, report lines, etc.

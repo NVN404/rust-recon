@@ -56,3 +56,26 @@ Parse the user's input to determine report style:
 - Section 2 (Instruction Surface): 1 summary table (condensed) vs. detailed per-instruction breakdown (detailed)
 - Diagrams: ASCII art only (no Mermaid in condensed mode)
 - Tone: Executive summary vs. comprehensive technical analysis
+
+## Step 5 — Output Quality Gate (Mandatory)
+Before finalizing `recon.md`, run this strict self-check. If any check fails, regenerate the relevant section.
+
+### Section 4 (ASCII Diagram Gate)
+- Reject output if 4a/4b/4c is a flat box with list text only.
+- Each of 4a/4b/4c must contain:
+    1) at least 3 boxed nodes
+    2) at least 4 directional edges/arrows
+    3) at least 2 hierarchy levels
+- Ensure role/instruction/state flow is visible in 4a.
+- Ensure phased transitions are visible in 4b.
+- Ensure seed/constraint/account dependency paths are visible in 4c.
+
+### Section 8 (Checklist Readability Gate)
+- Reject output if multiple checklist items appear on one line.
+- Enforce one `[ ]` item per line with blank lines between categories.
+- Enforce category order:
+    1) Missing body checks
+    2) Unchecked accounts
+    3) Arithmetic checks
+    4) Struct-field checks
+- Deduplicate identical checklist rows.

@@ -132,6 +132,21 @@ Write output to `recon.md` at the project root.
 - **DETAILED format:** Minimum 400+ lines of substantive content
 - **CONDENSED format:** Minimum 250 lines of substantive content
 
+## Step 4.5 — Mandatory Quality Gate
+
+Before returning the report, validate output quality. If any check fails, regenerate the affected section.
+
+### Diagram gate (Section 4)
+- 4a/4b/4c must be true ASCII diagrams with hierarchy and directional flow.
+- Flat rectangle + text list is invalid.
+- Each diagram must include at least 3 boxed nodes and 4 directional edges.
+
+### Checklist gate (Section 8)
+- One checklist item per line only.
+- Never concatenate multiple `[ ]` items in one paragraph.
+- Keep category grouping with blank lines between groups.
+- Deduplicate repeated checklist findings.
+
 ---
 
 ## Prerequisites
@@ -159,9 +174,19 @@ Follow **exactly** the section order below. Never skip a section.
 - Minimum **400+ lines** of substantive content
 - Full subsections 2a-2f for every instruction
 - Rich ASCII architecture diagrams in Section 4
+- Section 2c must use **Account Fact Cards** (not raw constraints dump)
 - Use tables for anything with 3+ entries
 - Use fenced code blocks for seeds, constraints, arithmetic expressions, and CPI signatures
 - **Use ASCII art for all diagrams** — NO Mermaid, NO markdown flowcharts
+
+### Section 2c Rule (Mandatory)
+- For each non-skipped account, emit a fact card with:
+  - `Validated by`
+  - `Mutation`
+  - `Gap` (only when meaningful)
+  - `Manual check`
+- Never paste raw constraint strings in 2c.
+- Skip cards for `system_program`, `rent`, `token_program`, `associated_token_program`.
 
 **CONDENSED FORMAT (Optional, only if user explicitly requests):**
 - Minimum **250 lines** of substantive content

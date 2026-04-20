@@ -1,0 +1,25 @@
+{
+  "agents": {
+    "copilot-cli": {
+      "skillsFile": "./.claude/skills.json",
+      "enabled": true
+    },
+    "copilot-vscode": {
+      "skillsFile": "./.vscode/settings.json",
+      "enabled": true
+    },
+    "claude": {
+      "skillsFile": "./.claude/skills.json",
+      "enabled": true
+    },
+    "cursor": {
+      "skillsFile": "./.vscode/settings.json",
+      "enabled": true
+    },
+    "codex": {
+      "skillsFile": "./.claude/skills.json",
+      "enabled": true
+    }
+  },
+  "defaultSkill": "rust-recon"
+}

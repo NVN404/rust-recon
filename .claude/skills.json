@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "skills": [
+    {
+      "name": "rust-recon",
+      "description": "Solana Anchor protocol reconnaissance - generates detailed recon reports from extracted facts",
+      "command": "./commands/recon.md",
+      "tags": ["solana", "anchor", "audit", "recon", "analysis"],
+      "parameters": {
+        "mode": {
+          "type": "enum",
+          "values": ["detailed", "condensed"],
+          "default": "detailed",
+          "description": "Report verbosity level"
+        },
+        "context": {
+          "type": "string",
+          "description": "Project or mission context (e.g., missionx, audit-phase-2)"
+        }
+      }
+    }
+  ]
+}

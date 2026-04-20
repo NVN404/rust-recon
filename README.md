@@ -40,21 +40,27 @@ When you invoke `/recon` in your AI agent (after installing this skill):
 git clone https://github.com/NVN404/rust-recon ~/.rust-recon-skill
 ```
 
-### Step 2: Link the Skill to Your AI Agent
+### Step 2: Automatic Skill Registration
+
+This repository includes **pre-built configuration files** for multi-agent support:
+
+- **`.claude/skills.json`** — Registered skill manifest (Claude, Copilot CLI, Codex)
+- **`.vscode/settings.json`** — VS Code workspace config (Copilot, Cursor)
+- **`.agent-config.json`** — Universal agent router for all AI platforms
+
+✅ **Nothing to install manually** — Your workspace is already configured!
 
 **For Claude Desktop (Canonical Setup):**
-1. Open Claude Desktop preferences/settings
-2. Navigate to "Custom Commands" or "Skills"
-3. Add the path: `~/.rust-recon-skill`
-4. Restart Claude
+1. Point Claude Desktop to your project root
+2. The skill auto-loads from `.claude/skills.json`
+3. Restart Claude if needed
 
-**For Other Agents:**
-- **Claude Web:** Navigate to https://claude.ai → Custom Commands/Skills → Upload `https://github.com/NVN404/rust-recon`
-- **Copilot:** Reference skill repo in settings → Point to `~/.rust-recon-skill`
-- **Cursor:** Access command/skill config → Link to `~/.rust-recon-skill`
-- **Others:** Follow your agent's custom command docs → Point to `~/.rust-recon-skill` or `https://github.com/NVN404/rust-recon`
+**For Copilot / Cursor / Codex:**
+1. Open the workspace in your editor
+2. Skill auto-registers via `.vscode/settings.json` or `.claude/skills.json`
+3. Start using `@rust-recon` immediately
 
-> **Note:** All agents should load `.claude/commands/recon.md` as the orchestrator script
+> **Note:** All agents read `.claude/commands/recon.md` as the orchestrator script. Config files ensure proper routing and parameter handling.
 
 ---
 
@@ -193,9 +199,50 @@ Use these to understand expected output quality and structure.
 
 ---
 
-##  Configuration
+##  Configuration Files
 
-No environment variables or API keys needed! Everything is local and works with any AI agent.
+This skill includes built-in multi-agent support via three configuration files:
+
+### `.claude/skills.json`
+Registers the skill for Claude, Copilot CLI, and Codex:
+```json
+{
+  "skills": [{
+    "name": "rust-recon",
+    "command": "./commands/recon.md",
+    "parameters": {
+      "mode": ["detailed", "condensed"],
+      "context": "project or mission context"
+    }
+  }]
+}
+```
+
+### `.vscode/settings.json`
+Enables skill in VS Code for Copilot and Cursor:
+```json
+{
+  "copilot.skills": {
+    "rust-recon": "./.claude/commands/recon.md"
+  }
+}
+```
+
+### `.agent-config.json`
+Universal router for all AI platforms (Claude, Copilot, Cursor, Codex):
+```json
+{
+  "agents": {
+    "copilot-cli": { "skillsFile": "./.claude/skills.json", "enabled": true },
+    "copilot-vscode": { "skillsFile": "./.vscode/settings.json", "enabled": true },
+    "claude": { "skillsFile": "./.claude/skills.json", "enabled": true },
+    "cursor": { "skillsFile": "./.vscode/settings.json", "enabled": true },
+    "codex": { "skillsFile": "./.claude/skills.json", "enabled": true }
+  }
+}
+```
+
+**No environment variables or API keys needed!** Everything is local and works out-of-the-box.
 
 If you want to use the tool **without this skill**, see the [rust-recon-tool README](https://github.com/NVN404/rust-recon-tool).
 

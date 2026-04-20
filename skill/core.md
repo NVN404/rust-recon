@@ -4,8 +4,9 @@ This file is the canonical authority for report behavior.
 
 If any instruction conflicts across files, use this precedence:
 1. `skill/core.md`
-2. `skill/references/section-specs.md`
-3. `skill/references/audit-patterns.md`
+2. `skill/guardrails.md`
+3. `skill/references/section-specs.md`
+4. `skill/references/audit-patterns.md`
 4. `skill/references/cpi-rules.md`
 5. `skill/examples/*` (examples are non-authoritative)
 

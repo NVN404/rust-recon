@@ -13,6 +13,18 @@ If guidance conflicts, resolve in this order:
 
 Do not invent formatting outside these rules.
 
+## Execution Guardrails (Non-Negotiable)
+
+1. Do not use Python, shell templating, or custom scripts to generate recon report text.
+2. Do not create helper generators in the skill directory during a run.
+3. Use a strict two-pass flow:
+    - Pass 1: extraction validation
+    - Pass 2: report synthesis
+4. Before Pass 2, print checklist PASS/FAIL and evidence checkpoints.
+5. If any required section, subsection, or table header is missing, fail the run.
+6. If placeholder-only text appears where extracted data exists, stop and regenerate.
+7. Before final output, include command transcript summary and explicit no-shortcut declaration.
+
 ## Step 0 - Prerequisites Check
 
 Before anything else, confirm:
@@ -86,7 +98,23 @@ Important:
 
 No third "standard" mode is allowed.
 
-## Step 5 - Generate Report
+## Step 5 - Pass 1 Extraction Validation (Required)
+
+Before drafting report content, print PASS/FAIL for:
+1. Prerequisites complete
+2. Tool availability complete
+3. Extraction commands executed
+4. Required output files exist
+5. Required files read in exact order
+
+Then print evidence checkpoints:
+1. Ordered command list with short purpose
+2. Ordered list of files read
+3. Active schema source (`skill/core.md`, `skill/references/section-specs.md`)
+
+If any check fails, stop and report exact failure reason.
+
+## Step 6 - Generate Report (Pass 2 Only)
 
 Write `recon.md` at project root.
 
@@ -100,7 +128,7 @@ Mandatory constraints:
 - No red/yellow/blue indicator emoji in findings sections.
 - Diagrams must be ASCII only.
 
-## Step 6 - Quality Gate (Fail Closed)
+## Step 7 - Quality Gate (Fail Closed)
 
 Before returning output, validate:
 1. All 9 sections exist in the required order.
@@ -109,5 +137,14 @@ Before returning output, validate:
 4. No forbidden columns (`Risk`, `Severity`) in Section 2 tables.
 5. Section 4 diagrams show directional flow (not flat lists).
 6. Section 8 checklist has one item per line.
+7. Placeholder text is not used as a bulk substitute for extracted content.
+8. Any `Not extracted - verify manually.` line is evidence-backed.
 
 If any check fails, regenerate the affected section(s) and re-run this gate.
+
+## Step 8 - Output Attestation (Required)
+
+Before final output, provide:
+1. Command transcript summary: every command run, in order, with purpose.
+2. Explicit declaration: `No shortcut report generator was used.`
+3. Reviewer statement: skill-compliant schema check passed.

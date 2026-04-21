@@ -2,6 +2,18 @@
 
 This reference defines how extracted fields map to recon report sections.
 
+## Output Layout (Primary + Fallback)
+
+Primary split layout (preferred):
+- `.rust-recon/global_facts.json` (program-level context)
+- `.rust-recon/facts/index.json` (ordered instruction file manifest)
+- `.rust-recon/facts/NN_instruction-name.json` (one instruction per file)
+
+Fallback compatibility layout:
+- `.rust-recon/facts.json` (legacy monolithic format)
+
+Agents must consume split layout first when present.
+
 ## Instruction-Level Fields
 
 | Field | Source | Meaning | Report Usage |
@@ -32,6 +44,7 @@ This reference defines how extracted fields map to recon report sections.
 
 | Field | Meaning | Report Usage |
 |---|---|---|
+| `program_id` | Extracted declare_id!() value | Section 1 table |
 | `data_structs[]` | Extracted account/data structs and fields | Section 3a |
 | `errors[]` | Extracted custom errors | Section 6 |
 | `flags[]` | Parser-generated signal candidates | Section 7 input |

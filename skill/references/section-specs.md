@@ -1,4 +1,4 @@
-# Section Specs (v3.0, Recon-First)
+# Section Specs (v3.1, Zero-Loss Recon)
 
 This file defines the exact report contract.
 
@@ -8,12 +8,15 @@ If this file conflicts with another reference, follow `skill/core.md`.
 
 1. Use only extracted facts from `.rust-recon/*.json`.
 2. No custom section names beyond the 1-9 contract.
-3. If data is missing, write exactly:
-   - `Not extracted - verify manually.`
-4. Use neutral recon language.
-5. Do not use red/yellow/blue indicator emoji.
-6. In Section 2 tables, never use `Risk` or `Severity` columns.
-7. Use ASCII-only diagrams in Section 4.
+3. `Not extracted - verify manually.` is ONLY permitted when the corresponding JSON array is genuinely empty or absent.
+4. NEVER write `Not extracted` when data exists. This is a CRITICAL failure.
+5. Use neutral recon language.
+6. Do not use red/yellow/blue indicator emoji.
+7. In Section 2 tables, never use `Risk` or `Severity` columns.
+8. Use ASCII-only diagrams in Section 4.
+9. NEVER omit instructions. Every instruction in facts.json gets full 2a-2f.
+10. NEVER write "omitted for brevity" or similar truncation.
+
 
 ## Report Modes
 
@@ -66,6 +69,10 @@ Required content:
 
 ## 2. Instruction Surface
 
+Source: `facts.json` → `instructions[]` array.
+EVERY object in `instructions[]` MUST produce a full 2.N subsection with 2a-2f.
+If facts.json has 14 instructions, Section 2 has exactly 14 subsections. NO EXCEPTIONS.
+
 Detailed mode: every instruction must include 2a through 2f in order.
 
 ### Instruction Header (required)
@@ -78,6 +85,9 @@ Context: ContextStructName | Signers: N | Accounts: N | Flags: N
 ```
 
 ### 2a - Parameter Table
+
+Source: `instructions[N].params[]` — each entry has `name`, `type`, `overflow_risk`.
+Every param in the array MUST appear as a row. If params[] is empty, write `No parameters.`
 
 If parameters exist, use exactly this header:
 
@@ -95,6 +105,15 @@ If none:
 - `No parameters.`
 
 ### 2b - Account Table
+
+Source: `instructions[N].accounts[]` — each entry has `name`, `wrapper_type`, `inner_type`, `is_mut`, `is_signer`, `unchecked`, `has_one[]`, `close_target`, `constraints[]`, `attributes`.
+Every account in the array MUST appear as a row. Map fields as follows:
+- `Account` ← `name`
+- `Type` ← `wrapper_type` (+ `inner_type` if present, e.g. `Account<MissionxState>`)
+- `Mut` ← `Yes` if `is_mut` is true
+- `Signer` ← `Yes` if `is_signer` is true
+- `Unchecked` ← `Yes` if `unchecked` is true
+- `Constraint Summary` ← derive from `constraints[]`, `has_one[]`, `close_target`
 
 Use exactly this header:
 
@@ -282,6 +301,10 @@ If Token-2022 indicators appear, note extension-sensitive checks:
 ---
 
 ## 6. Error Code Registry
+
+Source: `facts.json` → `errors[]` — each entry has `code` and `msg`.
+Every error in the array MUST appear as a row. Cross-reference with `instructions[N].error_codes_referenced[]`.
+If errors[] has 24 entries, this table MUST have 24 rows.
 
 | Code | Name | Message | Referenced By |
 |---|---|---|---|

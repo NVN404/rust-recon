@@ -14,7 +14,7 @@ When you invoke `/recon` in your AI agent (after installing this skill):
 
 1. **Automatically installs the `rust-recon` tool** (if not already on your machine)
 2. **Runs the deterministic AST extraction** against your Solana Anchor project
-3. **Reads all extracted JSON facts** (`scope.json`, `facts.json`, `summary.json`)
+3. **Reads all extracted JSON facts** (`scope.json`, `global_facts.json`, `facts/index.json`, per-instruction facts files, `summary.json`)
 4. **Generates a comprehensive recon report** with 9 sections:
    - Protocol Overview
    - Instruction Surface
@@ -40,7 +40,26 @@ When you invoke `/recon` in your AI agent (after installing this skill):
 git clone https://github.com/NVN404/rust-recon ~/.rust-recon-skill
 ```
 
-### Step 2: Automatic Skill Registration
+### Step 2: Install the CLI Tool
+
+Clone and compile the core `rust-recon-tool` CLI which handles AST extraction and workspace setup:
+
+```bash
+git clone https://github.com/NVN404/rust-recon-tool
+cd rust-recon-tool/cli
+cargo install --path .
+```
+
+### Step 3: Setup Your Target Workspace
+
+Navigate to the Solana project you want to audit and initialize the skill pointers. This automatically generates the AI rules and `CLAUDE.md` / `.cursorrules` inside a hidden `.rust-recon` directory.
+
+```bash
+cd /path/to/your/anchor/project
+rust-recon setup
+```
+
+### Step 4: Automatic Skill Registration
 
 This repository includes **pre-built configuration files** for multi-agent support:
 
@@ -120,7 +139,7 @@ The main orchestrator script. It:
 
 ### `skill/references/facts-schema.md`
 **Data Dictionary:**
-- Explains every field in `facts.json`
+- Explains every field in extracted facts (split layout + legacy `facts.json`)
 - `wrapper_type` definitions
 - `body_checks` interpretation
 - `flags[]` as parser signal metadata for Section 7
@@ -178,6 +197,7 @@ Use these to understand expected output quality and structure.
              ▼
 ┌─────────────────────────────────────────┐
 │  Tool runs:                             │
+│  • rust-recon setup                     │
 │  • rust-recon scope                     │
 │  • rust-recon facts                     │
 └────────────┬────────────────────────────┘
@@ -186,7 +206,9 @@ Use these to understand expected output quality and structure.
 ┌─────────────────────────────────────────┐
 │  Skill reads generated JSON + refs      │
 │  • .rust-recon/scope.json               │
-│  • .rust-recon/facts.json               │
+│  • .rust-recon/global_facts.json        │
+│  • .rust-recon/facts/index.json         │
+│  • .rust-recon/facts/*.json             │
 │  • skill/references/*.md (all rules)    │
 └────────────┬────────────────────────────┘
              │

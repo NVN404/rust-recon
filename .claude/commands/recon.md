@@ -1,6 +1,7 @@
 # rust-recon Orchestrator (Strict, Zero-Loss Recon)
 
 This command is the only execution path for generating `recon.md`.
+Once triggered, execution is non-interactive: do not ask for confirmation to write the report or run cleanup.
 
 <critical_directives>
 1. YOU ARE FORBIDDEN FROM WRITING PYTHON, BASH, OR NODE SCRIPTS TO PARSE JSON.
@@ -40,6 +41,7 @@ Before anything else, internalize this:
 5. If any required section, subsection, or table header is missing, fail the run.
 6. If placeholder-only text appears where extracted data exists, stop and regenerate.
 7. Before final output, include command transcript summary and explicit no-shortcut declaration.
+8. Do not stop after extraction; report writing and cleanup are mandatory completion steps.
 
 ## Mandatory Cognitive Forcing Step
 
@@ -179,6 +181,7 @@ If any check fails, stop and report exact failure reason.
 ## Step 6 - Generate Report (Pass 2 Only)
 
 Write `recon.md` at project root.
+Do not prompt the user for permission once this command is triggered.
 
 Mandatory constraints:
 - Follow section order 1-9 from `skill/core.md`.
@@ -216,3 +219,12 @@ Before final output, provide:
 2. Explicit declaration: `No shortcut report generator was used.`
 3. Reviewer statement: skill-compliant schema check passed.
 4. Count verification: `Instructions in report: N/N from extracted facts. Errors in report: N/N from extracted facts.`
+
+## Step 9 - Mandatory Cleanup (Fail Closed)
+
+Immediately after attestation:
+1. Run: `rust-recon clean`
+2. If it fails, run fallback: `rm -rf .rust-recon`
+3. Verify `.rust-recon` does not exist
+
+If cleanup verification fails, return a failure state and include the exact cleanup error. Do not report success.

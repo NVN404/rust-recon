@@ -213,4 +213,23 @@ Stop and regenerate if ANY condition is true:
 4. Any phrase like "omitted for brevity" or "remaining instructions follow same pattern" appears.
 5. Section 6 says "Not extracted" but `errors[]` in extracted facts is non-empty.
 
+
+## Mandatory Preflight Commit (Required Before Section 1)
+
+Before writing a single word of the report, output this exact block:
+
+PREFLIGHT COMMIT:
+- Instructions found: [exact number from facts/index.json]
+- Errors found: [exact number from errors[]]
+- Data structs found: [exact number]
+- I will write exactly [N] instruction subsections (2.1 through 2.N).
+- If any subsection is missing, the report is a failure.
+
+Do not begin Section 1 until this block is printed.
+
+
+ANTI-LAZY REMINDER: "Context: Unknown" and "Not extracted" are only permitted 
+when the JSON array is genuinely empty. If you write these for a non-empty array, 
+stop and rewrite that section immediately before continuing.
+
 This gate is fail-closed.

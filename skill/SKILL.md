@@ -1,5 +1,5 @@
 ---
-name: rust-recon-runbook
+name: skill
 description: Deterministic zero-loss runbook for generating Anchor protocol reconnaissance reports from rust-recon facts.
 ---
 

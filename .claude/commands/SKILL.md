@@ -1,5 +1,5 @@
 ---
-name: rust-recon-orchestrator
+name: commands
 description: Strict two-pass orchestrator for running rust-recon extraction and generating zero-loss recon reports.
 ---
 

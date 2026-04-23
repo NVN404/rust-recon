@@ -1,5 +1,5 @@
 ---
-name: rust-recon-vscode-routing
+name: .vscode
 description: VS Code routing metadata for the rust-recon skill entrypoint.
 ---
 

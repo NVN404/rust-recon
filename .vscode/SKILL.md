@@ -8,6 +8,6 @@ description: VS Code routing metadata for the rust-recon skill entrypoint.
 This folder stores editor settings used to route the rust-recon skill.
 
 Primary skill entrypoint:
-- `../.claude/commands/SKILL.md`
+- `../.claude/rust-recon/SKILL.md`
 
 The runnable orchestration content is maintained in that skill file.

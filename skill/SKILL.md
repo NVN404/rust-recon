@@ -120,7 +120,7 @@ Compatibility fallback:
 
 If any are missing, stop and report exact file(s).
 
-Note: `rust-recon facts` automatically deploys skill configs (CLAUDE.md, .claude/commands/SKILL.md, .cursorrules) into the project. If configs are missing, run:
+Note: `rust-recon facts` automatically deploys skill configs (CLAUDE.md, .claude/rust-recon/SKILL.md, .claude/commands/recon.md alias, .cursorrules) into the project. If configs are missing, run:
 ```bash
 rust-recon setup
 ```

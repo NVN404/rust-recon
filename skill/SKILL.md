@@ -80,7 +80,7 @@ If `Anchor.toml` is missing, stop and return:
 
 Check:
 ```bash
-rust-recon --version
+rust-recon --help
 ```
 
 If missing:
@@ -93,7 +93,7 @@ else
 fi
 cd "$TARGET_DIR"
 cargo install --path cli
-rust-recon --version
+rust-recon --help
 ```
 
 Stop on install failure.

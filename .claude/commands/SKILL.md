@@ -1,6 +1,6 @@
 ---
-name: commands
-description: Strict two-pass orchestrator for running rust-recon extraction and generating zero-loss recon reports.
+name: rust-recon
+description: Solana Anchor protocol reconnaissance - generates detailed recon reports from extracted facts
 ---
 
 # rust-recon Orchestrator (Strict, Zero-Loss Recon)
@@ -68,7 +68,7 @@ If `Anchor.toml` is missing, stop and return:
 Check binary first:
 
 ```bash
-rust-recon --version
+rust-recon --help
 ```
 
 If missing, install:
@@ -82,7 +82,7 @@ else
 fi
 cd "$TARGET_DIR"
 cargo install --path cli
-rust-recon --version
+rust-recon --help
 ```
 
 If install fails, report the exact error and stop.

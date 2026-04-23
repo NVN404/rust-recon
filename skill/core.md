@@ -114,7 +114,7 @@ During Pass 1, verify these fields exist and note their counts. During Pass 2, e
 
 Before any report text is drafted, print this checklist with PASS or FAIL:
 1. Prerequisites check complete (`Anchor.toml`, `rustc --version`).
-2. Tool availability check complete (`rust-recon --version`).
+2. Tool availability check complete (`rust-recon --help`).
 3. Extraction commands ran (`rust-recon scope`, `rust-recon facts`).
 4. Required output files exist (`scope.json`, `global_facts.json`, `facts/index.json`, per-instruction files, `summary.json`; or fallback `facts.json`).
 5. Required files were read in the mandated order.

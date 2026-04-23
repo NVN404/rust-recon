@@ -1,6 +1,9 @@
-# rust-recon Orchestrator (Strict, Zero-Loss Recon)
+---
+name: rust-recon-orchestrator
+description: Strict two-pass orchestrator for running rust-recon extraction and generating zero-loss recon reports.
+---
 
-Legacy compatibility alias: canonical skill entrypoint is `SKILL.md` in this same folder.
+# rust-recon Orchestrator (Strict, Zero-Loss Recon)
 
 This command is the only execution path for generating `recon.md`.
 Once triggered, execution is non-interactive: do not ask for confirmation to write the report or run cleanup.
@@ -25,10 +28,10 @@ Do not invent formatting outside these rules.
 ## CRITICAL: Zero Data Loss
 
 Before anything else, internalize this:
-- EVERY instruction in extracted facts → full 2a-2f subsection in the report.
-- EVERY param in params[] → row in 2a table.
-- EVERY account in accounts[] → row in 2b table.
-- EVERY error in errors[] → row in Section 6.
+- EVERY instruction in extracted facts -> full 2a-2f subsection in the report.
+- EVERY param in params[] -> row in 2a table.
+- EVERY account in accounts[] -> row in 2b table.
+- EVERY error in errors[] -> row in Section 6.
 - NEVER write "omitted for brevity." NEVER skip an instruction.
 - NEVER write "Not extracted" when data EXISTS in the JSON.
 

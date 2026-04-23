@@ -4,7 +4,7 @@
     {
       "name": "rust-recon",
       "description": "Solana Anchor protocol reconnaissance - generates detailed recon reports from extracted facts",
-      "command": "./commands/recon.md",
+      "command": "./commands/SKILL.md",
       "tags": ["solana", "anchor", "audit", "recon", "analysis"],
       "parameters": {
         "mode": {

@@ -79,7 +79,7 @@ This repository includes **pre-built configuration files** for multi-agent suppo
 2. Skill auto-registers via `.vscode/settings.json` or `.claude/skills.json`
 3. Start using `@rust-recon` immediately
 
-> **Note:** All agents read `.claude/commands/recon.md` as the orchestrator script. Config files ensure proper routing and parameter handling.
+> **Note:** All agents read `.claude/commands/SKILL.md` as the orchestrator script. Config files ensure proper routing and parameter handling.
 
 ---
 
@@ -120,7 +120,7 @@ Where:
 
 ##  Architecture
 
-### `.claude/commands/recon.md`
+### `.claude/commands/SKILL.md`
 The main orchestrator script. It:
 - Checks prerequisites and validates you're in an Anchor workspace
 - Downloads `rust-recon` to `~/.rust-recon_tool` (global)
@@ -183,7 +183,7 @@ Use these to understand expected output quality and structure.
              │
              ▼
 ┌─────────────────────────────────────────┐
-│  Skill reads: .claude/commands/recon.md │
+│  Skill reads: .claude/commands/SKILL.md │
 │  (this repo: rust-recon)                │
 └────────────┬────────────────────────────┘
              │
@@ -231,7 +231,7 @@ Registers the skill for Claude, Copilot CLI, and Codex:
 {
   "skills": [{
     "name": "rust-recon",
-    "command": "./commands/recon.md",
+    "command": "./commands/SKILL.md",
     "parameters": {
       "mode": ["detailed", "condensed"],
       "context": "project or mission context"
@@ -245,7 +245,7 @@ Enables skill in VS Code for Copilot and Cursor:
 ```json
 {
   "copilot.skills": {
-    "rust-recon": "./.claude/commands/recon.md"
+    "rust-recon": "./.claude/commands/SKILL.md"
   }
 }
 ```

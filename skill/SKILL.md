@@ -1,3 +1,8 @@
+---
+name: rust-recon-runbook
+description: Deterministic zero-loss runbook for generating Anchor protocol reconnaissance reports from rust-recon facts.
+---
+
 # rust-recon Skill Runbook (v3.1, Zero-Loss Recon)
 
 This skill is a deterministic runbook for generating protocol reconnaissance reports from
@@ -115,7 +120,7 @@ Compatibility fallback:
 
 If any are missing, stop and report exact file(s).
 
-Note: `rust-recon facts` automatically deploys skill configs (CLAUDE.md, .claude/commands/recon.md, .cursorrules) into the project. If configs are missing, run:
+Note: `rust-recon facts` automatically deploys skill configs (CLAUDE.md, .claude/commands/SKILL.md, .cursorrules) into the project. If configs are missing, run:
 ```bash
 rust-recon setup
 ```
